@@ -7,21 +7,26 @@ pragma solidity ^0.8.28;
 
 import {PriceConverter} from "PriceConverter.sol";
 
+error NotOwner();
+
 contract FundMe {
     using PriceConverter for uint256;
 
-    uint256 public minimumUSD = 5e18;
+    uint256 public constant MINIMUM_USD = 5e18;
     address[] public fundersAdd;
     mapping(address => uint256) public addressToAmounFunded;
 
-    address public owner;
+    address public immutable i_owner;
 
     constructor() {
-        owner = msg.sender;
+        i_owner = msg.sender;
     }
 
     function fund() public payable {
-        require(msg.value.getConvert() >= minimumUSD, "Didn't send enough ETH"); // 1e18 = 1*10**18;
+        require(
+            msg.value.getConvert() >= MINIMUM_USD,
+            "Didn't send enough ETH"
+        ); // 1e18 = 1*10**18;
         fundersAdd.push(msg.sender);
         addressToAmounFunded[msg.sender] =
             addressToAmounFunded[msg.sender] +
@@ -29,7 +34,6 @@ contract FundMe {
     }
 
     function withdraw() public onlyOwner {
-        require(msg.sender == owner, "Must be owner");
         for (uint256 i = 0; i < fundersAdd.length; i++) {
             address funder = fundersAdd[i];
             addressToAmounFunded[funder] = 0;
@@ -46,7 +50,6 @@ contract FundMe {
             3. Call(forward all gas or set gas, returns bool) use 
         */
 
-        
         (bool callSuccess, ) = payable(msg.sender).call{
             value: address(this).balance
         }("");
@@ -54,7 +57,21 @@ contract FundMe {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Must be owner");
+        // require(msg.sender == i_owner, "Must be owner");
+        if (msg.sender != i_owner) {
+            revert NotOwner();
+        }
         _;
     }
+
+    receive() external payable { 
+        fund();
+    }
+
+    fallback() external payable { 
+        fund();
+    }
+
+
+    // TO deploye to in Zksync network change the address to zksync test net if need 
 }
